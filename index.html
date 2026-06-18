@@ -101,6 +101,9 @@
     <div class="sec-title">덤불 · 꽃 · 돌</div>
     <div class="grid" id="palette-deco"></div>
 
+    <div class="sec-title">건물</div>
+    <div class="grid" id="palette-build"></div>
+
     <div class="sec-title">심기 옵션</div>
     <div class="slider-row">
       <label>크기</label>
@@ -518,14 +521,161 @@ function makePond() {
   return g;
 }
 
+// ====================== 건물 (전원주택/통나무집/트리하우스/정자) ======================
+// 박공 지붕(삼각 프리즘): w=용마루 방향 길이(x), d=가로폭(z)
+function makeGableRoof(w, d, roofH, over, color) {
+  const hw = d / 2 + over;
+  const sh = new THREE.Shape();
+  sh.moveTo(-hw, 0); sh.lineTo(hw, 0); sh.lineTo(0, roofH); sh.closePath();
+  const geo = new THREE.ExtrudeGeometry(sh, { depth: w + 2 * over, bevelEnabled: false });
+  geo.translate(0, 0, -(w + 2 * over) / 2);
+  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: .85 }));
+  m.rotation.y = Math.PI / 2;
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+function makeDoor(x, y, z, w = 0.9, h = 1.8) {
+  const g = new THREE.Group();
+  const door = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.14), new THREE.MeshStandardMaterial({ color: 0x6b4429, roughness: .8 }));
+  door.position.set(x, y + h / 2, z + 0.02); door.castShadow = true; g.add(door);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshStandardMaterial({ color: 0xe8c84a, metalness: .6, roughness: .3 }));
+  knob.position.set(x + w * 0.32, y + h * 0.5, z + 0.12); g.add(knob);
+  return g;
+}
+function makeWin(x, y, z, s = 0.85) {
+  const g = new THREE.Group();
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(s, s, 0.1), new THREE.MeshStandardMaterial({ color: 0xf6f1e6, roughness: .8 }));
+  frame.position.set(x, y, z); g.add(frame);
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(s * 0.74, s * 0.74, 0.12),
+    new THREE.MeshStandardMaterial({ color: 0x9fd2e8, roughness: .15, metalness: .1, emissive: 0x2a4d66, emissiveIntensity: .35 }));
+  glass.position.set(x, y, z + 0.02); g.add(glass);
+  return g;
+}
+
+const COTTAGE_WALLS = [0xf3ece0, 0xeed9c4, 0xe7eef0, 0xf0e2c8, 0xdfe9df];
+const COTTAGE_ROOFS = [0xb0492f, 0x9c3b2a, 0x7a5230, 0x4f6b8a, 0x6b4a2c];
+function makeCottage(seed, scaleMul) {
+  const r = mulberry32(seed); const g = new THREE.Group();
+  const w = 5, d = 4, h = 3;
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshStandardMaterial({ color: COTTAGE_WALLS[Math.floor(r() * COTTAGE_WALLS.length)], roughness: .92 }));
+  wall.position.y = h / 2; wall.castShadow = wall.receiveShadow = true; g.add(wall);
+  const roof = makeGableRoof(w, d, 1.9, 0.35, COTTAGE_ROOFS[Math.floor(r() * COTTAGE_ROOFS.length)]);
+  roof.position.y = h; g.add(roof);
+  const chim = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.6, 0.6), new THREE.MeshStandardMaterial({ color: 0x8a6a55, roughness: .9 }));
+  chim.position.set(w * 0.28, h + 1.0, -d * 0.12); chim.castShadow = true; g.add(chim);
+  g.add(makeDoor(0, 0, d / 2));
+  g.add(makeWin(-w * 0.3, 1.6, d / 2));
+  g.add(makeWin(w * 0.3, 1.6, d / 2));
+  g.add(makeWin(w / 2, 1.6, 0)); g.children[g.children.length - 1].rotation.y = Math.PI / 2;
+  g.scale.setScalar(scaleMul);
+  return g;
+}
+
+function makeLogCabin(seed, scaleMul) {
+  const r = mulberry32(seed); const g = new THREE.Group();
+  const w = 5, d = 4, logR = 0.32, rows = 5, dy = logR * 1.85;
+  const tone = 0.5 + r() * 0.3;
+  const logMat = new THREE.MeshStandardMaterial({ color: new THREE.Color().setHSL(0.08, 0.5, tone * 0.45), roughness: .95 });
+  for (let i = 0; i < rows; i++) {
+    const y = logR + i * dy;
+    for (const zz of [-d / 2, d / 2]) {
+      const log = new THREE.Mesh(new THREE.CylinderGeometry(logR, logR, w + logR * 2, 8), logMat);
+      log.rotation.z = Math.PI / 2; log.position.set(0, y, zz); log.castShadow = log.receiveShadow = true; g.add(log);
+    }
+    for (const xx of [-w / 2, w / 2]) {
+      const log = new THREE.Mesh(new THREE.CylinderGeometry(logR, logR, d + logR * 2, 8), logMat);
+      log.rotation.x = Math.PI / 2; log.position.set(xx, y + dy / 2, 0); log.castShadow = log.receiveShadow = true; g.add(log);
+    }
+  }
+  const wallTop = logR + rows * dy;
+  const roof = makeGableRoof(w + 0.4, d + 0.4, 1.9, 0.4, 0x5b3a22); roof.position.y = wallTop; g.add(roof);
+  g.add(makeDoor(0, 0, d / 2 + logR));
+  g.add(makeWin(w * 0.3, wallTop * 0.5, d / 2 + logR, 0.8));
+  g.scale.setScalar(scaleMul);
+  return g;
+}
+
+function makeTreehouse(seed, scaleMul) {
+  const r = mulberry32(seed); const g = new THREE.Group();
+  const trunkH = 3.4, trunkR = 0.6;
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(trunkR * 0.8, trunkR, trunkH, 9),
+    new THREE.MeshStandardMaterial({ color: 0x6b4a2f, roughness: 1 }));
+  trunk.position.y = trunkH / 2; trunk.castShadow = trunk.receiveShadow = true; g.add(trunk);
+  const folMat = new THREE.MeshStandardMaterial({ color: 0x4f9a3c, roughness: .9 });
+  for (let i = 0; i < 5; i++) {
+    const s = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5 + r() * 0.7, 0), folMat);
+    s.position.set((r() - .5) * 2.4, trunkH + 1.2 + (r() - .5) * 1.2, (r() - .5) * 2.4);
+    s.castShadow = true; g.add(s);
+  }
+  const platY = 2.7, pw = 3.8, pd = 3.4;
+  const plat = new THREE.Mesh(new THREE.BoxGeometry(pw, 0.25, pd), new THREE.MeshStandardMaterial({ color: 0x9c6b3f, roughness: .9 }));
+  plat.position.y = platY; plat.castShadow = plat.receiveShadow = true; g.add(plat);
+  const postMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2f, roughness: 1 });
+  for (const [px, pz] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, platY, 6), postMat);
+    post.position.set(px * (pw / 2 - 0.3), platY / 2, pz * (pd / 2 - 0.3)); post.castShadow = true; g.add(post);
+  }
+  // 난간
+  const railMat = new THREE.MeshStandardMaterial({ color: 0x8a5a33, roughness: .9 });
+  for (const [ax, az, len, rot] of [[0, pd / 2, pw, 0], [0, -pd / 2, pw, 0], [pw / 2, 0, pd, Math.PI / 2], [-pw / 2, 0, pd, Math.PI / 2]]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(len, 0.08, 0.08), railMat);
+    rail.position.set(ax, platY + 0.7, az); rail.rotation.y = rot; g.add(rail);
+  }
+  // 오두막
+  const cw = 2.6, cd = 2.2, chh = 1.8, baseY = platY + 0.125;
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(cw, chh, cd), new THREE.MeshStandardMaterial({ color: 0xc9a06a, roughness: .9 }));
+  cab.position.y = baseY + chh / 2; cab.castShadow = cab.receiveShadow = true; g.add(cab);
+  const roof = makeGableRoof(cw, cd, 1.2, 0.25, 0x7a4a2c); roof.position.y = baseY + chh; g.add(roof);
+  const door = makeDoor(0, baseY, cd / 2, 0.7, 1.2); g.add(door);
+  g.add(makeWin(cw / 2, baseY + 1.0, 0, 0.6)); g.children[g.children.length - 1].rotation.y = Math.PI / 2;
+  // 사다리
+  const ladMat = new THREE.MeshStandardMaterial({ color: 0x7a5230, roughness: 1 });
+  const lz = pd / 2 + 0.15;
+  for (const lx of [-0.4, 0.4]) {
+    const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, platY + 0.2, 6), ladMat);
+    rail.position.set(lx, (platY + 0.2) / 2, lz); g.add(rail);
+  }
+  for (let i = 0; i < 5; i++) {
+    const rung = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.9, 6), ladMat);
+    rung.rotation.z = Math.PI / 2; rung.position.set(0, 0.4 + i * 0.55, lz); g.add(rung);
+  }
+  g.scale.setScalar(scaleMul);
+  return g;
+}
+
+function makeGazebo(seed, scaleMul) {
+  const r = mulberry32(seed); const g = new THREE.Group();
+  const R = 2.4, sides = 6, postH = 2.6;
+  const floor = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 0.25, sides),
+    new THREE.MeshStandardMaterial({ color: 0xb98e5a, roughness: .9 }));
+  floor.position.y = 0.12; floor.receiveShadow = true; g.add(floor);
+  const postMat = new THREE.MeshStandardMaterial({ color: 0x9c6b3f, roughness: .9 });
+  for (let i = 0; i < sides; i++) {
+    const a = i / sides * Math.PI * 2;
+    const p = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, postH, 6), postMat);
+    p.position.set(Math.cos(a) * R * 0.88, postH / 2 + 0.22, Math.sin(a) * R * 0.88); p.castShadow = true; g.add(p);
+  }
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(R * 1.18, 1.6, sides),
+    new THREE.MeshStandardMaterial({ color: [0x6b8aa0, 0x8a5a44, 0x5b7a55][Math.floor(r() * 3)], roughness: .8 }));
+  roof.position.y = postH + 0.22 + 0.8; roof.castShadow = true; g.add(roof);
+  g.scale.setScalar(scaleMul);
+  return g;
+}
+
 // ====================== 생성 레지스트리 + 배치 ======================
 const SWAY_KINDS = new Set(['tree', 'bush', 'flower']);
+const BUILDING_KINDS = new Set(['cottage', 'cabin', 'treehouse', 'gazebo']);
 function create(kind, opts) {
   const { seed, scaleMul = 1, variant = 'oak' } = opts;
   if (kind === 'tree')   return makeTree(variant, seed, scaleMul);
   if (kind === 'bush')   return makeBush(seed, scaleMul);
   if (kind === 'flower') return makeFlower(seed, scaleMul);
   if (kind === 'rock')   return makeRock(seed, scaleMul);
+  if (kind === 'cottage')   return makeCottage(seed, scaleMul);
+  if (kind === 'cabin')     return makeLogCabin(seed, scaleMul);
+  if (kind === 'treehouse') return makeTreehouse(seed, scaleMul);
+  if (kind === 'gazebo')    return makeGazebo(seed, scaleMul);
   if (kind === 'pathstone') return makePathStone(seed);
   if (kind === 'pond')   return makePond();
   return makeBush(seed, scaleMul);
@@ -536,7 +686,7 @@ function place(kind, x, z, opts = {}) {
   const variant = opts.variant ?? 'oak';
   const obj = create(kind, { seed, scaleMul, variant });
   obj.position.set(x, opts.y ?? 0, z);
-  obj.rotation.y = opts.ry ?? (Math.random() * Math.PI * 2);
+  obj.rotation.y = opts.ry ?? (BUILDING_KINDS.has(kind) ? Math.floor(Math.random() * 4) * Math.PI / 2 : Math.random() * Math.PI * 2);
   obj.userData = { kind, variant, seed, scaleMul };
   if (SWAY_KINDS.has(kind)) { obj.userData.phase = Math.random() * Math.PI * 2; swayables.push(obj); }
   placedGroup.add(obj);
@@ -570,6 +720,12 @@ const DECO_ITEMS = [
   { k: 'flower', emoji: '🌷', lbl: '꽃' },
   { k: 'rock',   emoji: '🪨', lbl: '돌' },
 ];
+const BUILD_ITEMS = [
+  { k: 'cottage',   emoji: '🏡', lbl: '전원주택' },
+  { k: 'cabin',     emoji: '🪵', lbl: '통나무집' },
+  { k: 'treehouse', emoji: '🌲', lbl: '트리하우스' },
+  { k: 'gazebo',    emoji: '⛩️', lbl: '정자' },
+];
 let selKind = 'tree', selVariant = 'oak';
 
 function buildPalette() {
@@ -590,6 +746,15 @@ function buildPalette() {
     d.innerHTML = `<span class="emoji">${it.emoji}</span><span class="lbl">${it.lbl}</span>`;
     d.onclick = () => selectItem(it.k, '');
     dEl.appendChild(d);
+  });
+  const bEl = document.getElementById('palette-build');
+  BUILD_ITEMS.forEach(it => {
+    const d = document.createElement('div');
+    d.className = 'item';
+    d.dataset.sel = it.k + ':';
+    d.innerHTML = `<span class="emoji">${it.emoji}</span><span class="lbl">${it.lbl}</span>`;
+    d.onclick = () => selectItem(it.k, '');
+    bEl.appendChild(d);
   });
 }
 function selectItem(kind, variant) {
@@ -665,6 +830,11 @@ function buildShowcaseGarden() {
   place('tree', 13, -8, { variant: 'oak', scaleMul: 1.3 });
   for (let z = -20; z <= 20; z += 3) place('pathstone', (Math.random() - .5) * 0.6, z);
   place('pond', -16, 14);
+  // 건물들
+  place('cottage', 16, -2, { ry: -Math.PI / 2, scaleMul: 1.1 });
+  place('cabin', -18, -4, { ry: Math.PI / 2, scaleMul: 1.05 });
+  place('treehouse', 18, 16, { ry: Math.PI, scaleMul: 1.1 });
+  place('gazebo', -8, -16, { ry: 0, scaleMul: 1.1 });
   for (let i = 0; i < 12; i++) { const a = Math.random() * 6.28, d = 8 + Math.random() * 18; place('bush', Math.cos(a) * d, Math.sin(a) * d); }
   [[8, 8], [-8, 10], [10, -14], [-14, -10], [18, 4], [-4, 18]].forEach(([bx, bz]) => {
     for (let i = 0; i < 6; i++) place('flower', bx + (Math.random() - .5) * 5, bz + (Math.random() - .5) * 5);
