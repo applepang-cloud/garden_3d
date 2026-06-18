@@ -18,38 +18,40 @@
     box-shadow: 0 4px 16px rgba(0,0,0,.25); transition: opacity .4s; text-align: center;
   }
 
-  /* 패널 30% 축소 (가로 화면: 우측 세로 패널) */
+  /* 하단 한 줄 툴바 — 가로 스크롤로 선택, 정원을 최대한 넓게 */
   #panel {
-    position: fixed; top: 0; right: 0; height: 100%; width: 190px;
-    background: linear-gradient(180deg, rgba(28,40,30,.95), rgba(16,24,18,.97));
+    position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+    width: 100%; height: auto;
+    background: linear-gradient(180deg, rgba(22,32,24,.90), rgba(13,19,14,.95));
     backdrop-filter: blur(10px); color: #e8f3e6; z-index: 10;
     display: flex; flex-direction: column;
-    box-shadow: -6px 0 24px rgba(0,0,0,.32);
-    border-left: 1px solid rgba(140,200,140,.18);
+    border-top: 1px solid rgba(140,200,140,.22);
+    box-shadow: 0 -6px 22px rgba(0,0,0,.34);
   }
-  #panel header { padding: 11px 13px 9px; border-bottom: 1px solid rgba(140,200,140,.16); }
-  #panel header h1 { font-size: 14px; font-weight: 700; letter-spacing: .3px; }
-  #panel header p { font-size: 9px; color: #9fc99a; margin-top: 2px; }
-  .scroll { flex: 1; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; padding: 9px 12px 16px; }
-  .scroll::-webkit-scrollbar { width: 7px; height: 7px; }
-  .scroll::-webkit-scrollbar-thumb { background: rgba(140,200,140,.25); border-radius: 8px; }
-  .psec { display: block; }
+  #panel header { display: none; }                 /* 한 줄 확보를 위해 제목 숨김 */
+  .scroll { display: flex; flex-direction: row; align-items: center;
+    overflow-x: auto; overflow-y: hidden; padding: 7px 12px; gap: 4px; }
+  .scroll::-webkit-scrollbar { height: 7px; }
+  .scroll::-webkit-scrollbar-thumb { background: rgba(140,200,140,.3); border-radius: 8px; }
+  .scroll::-webkit-scrollbar-track { background: transparent; }
 
-  .sec-title { font-size: 9px; text-transform: uppercase; letter-spacing: 1px;
-    color: #84b884; margin: 11px 2px 6px; font-weight: 700; }
-  .psec:first-child .sec-title { margin-top: 2px; }
+  .psec { display: inline-flex; flex-direction: row; align-items: center; gap: 5px;
+    flex: 0 0 auto; height: 56px; padding: 0 9px;
+    border-left: 1px solid rgba(140,200,140,.16); }
+  .psec:first-child { border-left: none; padding-left: 2px; }
+  .sec-title { display: none; }                     /* 한 줄: 구분선으로 그룹 구분 */
 
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
-  .item { display: flex; flex-direction: column; align-items: center; gap: 3px;
+  .grid { display: inline-flex; flex-direction: row; gap: 5px; }
+  .item { flex: 0 0 auto; width: 50px; display: flex; flex-direction: column; align-items: center; gap: 2px;
     padding: 6px 3px; border-radius: 9px; cursor: pointer;
     background: rgba(255,255,255,.05); border: 1.5px solid transparent; transition: all .15s; user-select: none; }
   .item:hover { background: rgba(255,255,255,.1); transform: translateY(-1px); }
   .item.active { border-color: #7ed957; background: rgba(126,217,87,.16); box-shadow: 0 0 0 1px rgba(126,217,87,.3); }
-  .item .emoji { font-size: 16px; line-height: 1; }
-  .item .lbl { font-size: 10px; color: #cfe6cb; }
+  .item .emoji { font-size: 17px; line-height: 1; }
+  .item .lbl { font-size: 9.5px; color: #cfe6cb; white-space: nowrap; }
 
-  .btn { display: flex; align-items: center; justify-content: center; gap: 5px;
-    width: 100%; padding: 8px; border: none; border-radius: 9px;
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    width: auto; padding: 8px 11px; border: none; border-radius: 9px; white-space: nowrap;
     font-size: 11px; font-weight: 600; cursor: pointer; color: #fff; transition: filter .15s, transform .1s; }
   .btn:hover { filter: brightness(1.1); }
   .btn:active { transform: scale(.98); }
@@ -57,47 +59,26 @@
   .btn.tour   { background: linear-gradient(135deg, #e8a33d, #d97b2a); }
   .btn.ghost  { background: rgba(255,255,255,.08); color: #d6ead2; }
   .btn.danger.active { background: linear-gradient(135deg, #e05a5a, #c23b3b); color:#fff; }
-  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
-  .stack { display: flex; flex-direction: column; gap: 5px; }
+  .row2 { display: inline-flex; flex-direction: row; gap: 5px; }
+  .stack { display: inline-flex; flex-direction: row; align-items: center; gap: 5px; }
 
-  .slider-row { display:flex; align-items:center; gap:7px; padding: 2px 2px; }
-  .slider-row label { font-size:10px; color:#cfe6cb; min-width:26px; }
-  .slider-row input[type=range]{ flex:1; accent-color:#7ed957; }
-  .slider-row .val { font-size:10px; color:#9fc99a; min-width:26px; text-align:right; }
+  .slider-row { display:inline-flex; align-items:center; gap:6px; width: 138px; }
+  .slider-row label { font-size:10px; color:#cfe6cb; }
+  .slider-row input[type=range]{ flex:1; accent-color:#7ed957; min-width: 0; }
+  .slider-row .val { font-size:10px; color:#9fc99a; min-width:30px; text-align:right; }
 
-  .toggles { display:grid; grid-template-columns:1fr 1fr 1fr; gap:5px; }
-  .tg { display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 3px;
+  .toggles { display:inline-flex; flex-direction: row; gap:5px; }
+  .tg { width: 46px; display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 3px;
     border-radius:9px; cursor:pointer; user-select:none; background:rgba(255,255,255,.05);
     border:1.5px solid transparent; transition:all .15s; }
   .tg:hover{ background:rgba(255,255,255,.1); }
   .tg.active{ border-color:#5cc8ff; background:rgba(92,200,255,.16); box-shadow:0 0 0 1px rgba(92,200,255,.3); }
-  .tg .emoji{ font-size:15px; } .tg .lbl{ font-size:9px; color:#cfe6cb; }
+  .tg .emoji{ font-size:15px; } .tg .lbl{ font-size:9px; color:#cfe6cb; white-space:nowrap; }
 
-  .count { font-size: 10px; color: #9fc99a; text-align: center; margin-top: 9px; }
+  .count { font-size: 10px; color: #9fc99a; white-space: nowrap; margin: 0 2px; flex: 0 0 auto; }
 
-  /* 세로로 긴 화면: 메뉴를 하단 가로 스크롤 바로 동적 전환 */
-  @media (orientation: portrait) {
-    #panel {
-      top: auto; bottom: 0; left: 0; right: 0; width: 100%; height: auto; max-height: 44vh;
-      flex-direction: column; border-left: none; border-top: 1px solid rgba(140,200,140,.2);
-      box-shadow: 0 -6px 24px rgba(0,0,0,.34);
-    }
-    #panel header { padding: 7px 14px; display: flex; align-items: baseline; gap: 8px;
-      border-bottom: 1px solid rgba(140,200,140,.14); }
-    #panel header h1 { font-size: 13px; }
-    #panel header p { display: none; }
-    .scroll { flex-direction: row; align-items: flex-start; overflow-x: auto; overflow-y: hidden;
-      padding: 8px 14px 10px; gap: 14px; }
-    .psec { flex: 0 0 auto; display: flex; flex-direction: column;
-      border-left: 1px solid rgba(140,200,140,.12); padding-left: 14px; }
-    .psec:first-child { border-left: none; padding-left: 0; }
-    .sec-title { margin: 0 2px 6px; white-space: nowrap; }
-    .grid { grid-template-columns: repeat(2, 52px); }
-    .toggles { grid-template-columns: repeat(3, 46px); }
-    .slider-row { width: 160px; }
-    .stack, .row2 { min-width: 160px; }
-    .count { white-space: nowrap; margin-top: 6px; }
-  }
+  /* 제거 모드 버튼: 한 줄에서 짧게 */
+  #btn-remove { padding: 8px 10px; }
 
   #loader { position: fixed; inset: 0; background: #1b2a1f; color: #cfe6cb; z-index: 50;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; transition: opacity .5s; }
@@ -142,7 +123,7 @@
         <input type="range" id="size" min="0.5" max="2" step="0.05" value="1">
         <span class="val" id="size-val">1.0×</span>
       </div>
-      <button class="btn ghost danger" id="btn-remove" style="margin-top:6px">🗑 제거 모드 끄기</button>
+      <button class="btn ghost danger" id="btn-remove">🗑 제거</button>
     </div>
 
     <div class="psec">
@@ -813,7 +794,7 @@ let removeMode = false;
 const removeBtn = document.getElementById('btn-remove');
 function toggleRemove(force) {
   removeMode = force != null ? force : !removeMode;
-  removeBtn.textContent = removeMode ? '🗑 제거 모드 켜짐 (클릭=삭제)' : '🗑 제거 모드 끄기';
+  removeBtn.textContent = removeMode ? '🗑 제거 ON' : '🗑 제거';
   removeBtn.classList.toggle('active', removeMode);
   renderer.domElement.style.cursor = removeMode ? 'crosshair' : 'default';
   if (removeMode) showHint('🗑 제거할 식물을 클릭하세요');
