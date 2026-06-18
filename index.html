@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>나의 3D 정원 · My Garden</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; font-family: 'Segoe UI', 'Malgun Gothic', sans-serif; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+
+  #hint {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+    background: rgba(20,30,20,.72); color: #eafbe7; padding: 9px 18px;
+    border-radius: 999px; font-size: 14px; letter-spacing: .2px;
+    backdrop-filter: blur(6px); z-index: 5; pointer-events: none;
+    box-shadow: 0 4px 16px rgba(0,0,0,.25); transition: opacity .4s; text-align: center;
+  }
+
+  #panel {
+    position: fixed; top: 0; right: 0; height: 100%; width: 270px;
+    background: linear-gradient(180deg, rgba(28,40,30,.95), rgba(16,24,18,.97));
+    backdrop-filter: blur(10px); color: #e8f3e6; z-index: 10;
+    display: flex; flex-direction: column;
+    box-shadow: -6px 0 24px rgba(0,0,0,.32);
+    border-left: 1px solid rgba(140,200,140,.18);
+  }
+  #panel header { padding: 16px 18px 12px; border-bottom: 1px solid rgba(140,200,140,.16); }
+  #panel header h1 { font-size: 19px; font-weight: 700; letter-spacing: .3px; }
+  #panel header p { font-size: 12px; color: #9fc99a; margin-top: 3px; }
+  .scroll { flex: 1; overflow-y: auto; padding: 12px 16px 22px; }
+  .scroll::-webkit-scrollbar { width: 8px; }
+  .scroll::-webkit-scrollbar-thumb { background: rgba(140,200,140,.25); border-radius: 8px; }
+
+  .sec-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1.3px;
+    color: #84b884; margin: 16px 2px 9px; font-weight: 700; }
+  .sec-title:first-child { margin-top: 2px; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .grid4 { grid-template-columns: 1fr 1fr; }
+  .item { display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 9px 4px; border-radius: 11px; cursor: pointer;
+    background: rgba(255,255,255,.05); border: 1.5px solid transparent; transition: all .15s; user-select: none; }
+  .item:hover { background: rgba(255,255,255,.1); transform: translateY(-1px); }
+  .item.active { border-color: #7ed957; background: rgba(126,217,87,.16); box-shadow: 0 0 0 1px rgba(126,217,87,.3); }
+  .item .emoji { font-size: 23px; line-height: 1; }
+  .item .lbl { font-size: 11.5px; color: #cfe6cb; }
+
+  .btn { display: flex; align-items: center; justify-content: center; gap: 7px;
+    width: 100%; padding: 11px; border: none; border-radius: 11px;
+    font-size: 13.5px; font-weight: 600; cursor: pointer; color: #fff; transition: filter .15s, transform .1s; }
+  .btn:hover { filter: brightness(1.1); }
+  .btn:active { transform: scale(.98); }
+  .btn.primary { background: linear-gradient(135deg, #3fae5a, #2d8c47); box-shadow: 0 4px 14px rgba(45,140,71,.4); }
+  .btn.tour   { background: linear-gradient(135deg, #e8a33d, #d97b2a); }
+  .btn.ghost  { background: rgba(255,255,255,.08); color: #d6ead2; }
+  .btn.danger.active { background: linear-gradient(135deg, #e05a5a, #c23b3b); color:#fff; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .stack { display: flex; flex-direction: column; gap: 7px; }
+
+  .slider-row { display:flex; align-items:center; gap:10px; padding: 2px 2px; }
+  .slider-row label { font-size:12.5px; color:#cfe6cb; min-width:34px; }
+  .slider-row input[type=range]{ flex:1; accent-color:#7ed957; }
+  .slider-row .val { font-size:12.5px; color:#9fc99a; min-width:34px; text-align:right; }
+
+  .toggles { display:grid; grid-template-columns:1fr 1fr 1fr; gap:7px; }
+  .tg { display:flex; flex-direction:column; align-items:center; gap:3px; padding:9px 4px;
+    border-radius:11px; cursor:pointer; user-select:none; background:rgba(255,255,255,.05);
+    border:1.5px solid transparent; transition:all .15s; }
+  .tg:hover{ background:rgba(255,255,255,.1); }
+  .tg.active{ border-color:#5cc8ff; background:rgba(92,200,255,.16); box-shadow:0 0 0 1px rgba(92,200,255,.3); }
+  .tg .emoji{ font-size:21px; } .tg .lbl{ font-size:11px; color:#cfe6cb; }
+
+  .count { font-size: 12px; color: #9fc99a; text-align: center; margin-top: 12px; }
+
+  #loader { position: fixed; inset: 0; background: #1b2a1f; color: #cfe6cb; z-index: 50;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; transition: opacity .5s; }
+  .spinner { width: 42px; height: 42px; border: 4px solid rgba(126,217,87,.25); border-top-color: #7ed957; border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: rgba(20,30,20,.9); color: #eafbe7; padding: 10px 20px; border-radius: 10px;
+    font-size: 13.5px; z-index: 20; opacity: 0; transition: all .3s; pointer-events: none; }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="hint">🌱 땅을 클릭해서 식물을 심어보세요 · 드래그=시점회전 · 휠=확대/축소</div>
+
+<div id="panel">
+  <header>
+    <h1>🌳 나의 정원</h1>
+    <p>땅을 클릭해 식물을 심어요</p>
+  </header>
+  <div class="scroll">
+    <div class="sec-title">나무</div>
+    <div class="grid" id="palette-trees"></div>
+
+    <div class="sec-title">덤불 · 꽃 · 돌</div>
+    <div class="grid" id="palette-deco"></div>
+
+    <div class="sec-title">심기 옵션</div>
+    <div class="slider-row">
+      <label>크기</label>
+      <input type="range" id="size" min="0.5" max="2" step="0.05" value="1">
+      <span class="val" id="size-val">1.0×</span>
+    </div>
+    <button class="btn ghost danger" id="btn-remove" style="margin-top:6px">🗑 제거 모드 끄기</button>
+
+    <div class="sec-title">분위기 (소리 포함)</div>
+    <div class="toggles">
+      <div class="tg" id="tg-wind"><span class="emoji">🌬️</span><span class="lbl">바람</span></div>
+      <div class="tg" id="tg-birds"><span class="emoji">🐦</span><span class="lbl">새</span></div>
+      <div class="tg" id="tg-water"><span class="emoji">💧</span><span class="lbl">물길</span></div>
+    </div>
+
+    <div class="sec-title">정원</div>
+    <div class="stack">
+      <button class="btn tour" id="btn-tour">✨ 정원 구경</button>
+      <div class="row2">
+        <button class="btn primary" id="btn-save">💾 저장</button>
+        <button class="btn primary" id="btn-load">📂 불러오기</button>
+      </div>
+      <div class="row2">
+        <button class="btn ghost" id="btn-undo">↩ 되돌리기</button>
+        <button class="btn ghost" id="btn-clear">🧹 비우기</button>
+      </div>
+    </div>
+    <div class="count" id="count">심은 식물: 0개</div>
+  </div>
+</div>
+
+<input type="file" id="file-input" accept=".json" style="display:none">
+<div id="loader"><div class="spinner"></div><div>정원을 준비하는 중...</div></div>
+<div id="toast"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.167.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.167.1/examples/jsm/",
+    "@dgreenheck/ez-tree": "https://cdn.jsdelivr.net/npm/@dgreenheck/ez-tree@1.1.0/build/ez-tree.es.js"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { Tree } from '@dgreenheck/ez-tree';
+
+// ====================== 유틸: 시드 난수 ======================
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const randSeed = () => Math.floor(Math.random() * 1e9);
+
+// ====================== 렌더러 / 씬 ======================
+const app = document.getElementById('app');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+app.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xacd2ea, 70, 260);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 2000);
+camera.position.set(28, 20, 34);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.target.set(0, 3, 0);
+controls.maxPolarAngle = Math.PI / 2.04;
+controls.minDistance = 3;        // 더 가까이 확대
+controls.maxDistance = 220;      // 더 멀리 축소
+controls.zoomToCursor = true;
+controls.zoomSpeed = 1.25;
+controls.autoRotateSpeed = 0.7;
+
+// ====================== 하늘 그라데이션 (스카이돔) ======================
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false,
+  uniforms: {
+    top: { value: new THREE.Color(0x2a6fc9) },
+    mid: { value: new THREE.Color(0xacd2ea) },
+    bot: { value: new THREE.Color(0xe7f3ea) },
+  },
+  vertexShader: `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `uniform vec3 top,mid,bot; varying vec3 vP;
+    void main(){ float h = normalize(vP).y;
+      vec3 c = h > 0.0 ? mix(mid, top, pow(h,0.55)) : mix(mid, bot, pow(-h,0.5));
+      gl_FragColor = vec4(c,1.0); }`,
+});
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(600, 32, 16), skyMat));
+
+// ====================== 조명 ======================
+scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x4a6b3c, 0.85));
+const sun = new THREE.DirectionalLight(0xfff2d6, 1.7);
+sun.position.set(36, 50, 22);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 1; sun.shadow.camera.far = 180;
+sun.shadow.camera.left = -75; sun.shadow.camera.right = 75;
+sun.shadow.camera.top = 75; sun.shadow.camera.bottom = -75;
+sun.shadow.bias = -0.0005;
+scene.add(sun);
+
+// ====================== 절차적 잔디 텍스처 + 땅 ======================
+function makeGrassTexture() {
+  const s = 512, cv = document.createElement('canvas'); cv.width = cv.height = s;
+  const x = cv.getContext('2d');
+  x.fillStyle = '#5f9e44'; x.fillRect(0, 0, s, s);
+  for (let i = 0; i < 9000; i++) {
+    const g = 60 + Math.random() * 80;
+    x.fillStyle = `rgba(${30 + Math.random() * 40},${g + 30},${30 + Math.random() * 40},${0.25 + Math.random() * 0.35})`;
+    const px = Math.random() * s, py = Math.random() * s, w = 1 + Math.random() * 2, h = 2 + Math.random() * 4;
+    x.fillRect(px, py, w, h);
+  }
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(28, 28);
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  return t;
+}
+const ground = new THREE.Mesh(
+  new THREE.CircleGeometry(160, 80),
+  new THREE.MeshStandardMaterial({ map: makeGrassTexture(), color: 0xbcd8a8, roughness: 1 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ====================== 잔디밭 (인스턴스드 + 바람 셰이더) ======================
+const windU = { time: { value: 0 }, strength: { value: 0.12 } };  // 공유 유니폼
+
+function makeGrassField(count = 4800, radius = 70) {
+  const blade = new THREE.PlaneGeometry(0.09, 0.6, 1, 3);
+  blade.translate(0, 0.3, 0);            // 밑동을 원점으로
+  const mat = new THREE.MeshStandardMaterial({ color: 0x6fb04a, side: THREE.DoubleSide, roughness: 1 });
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uTime = windU.time; sh.uniforms.uWind = windU.strength;
+    sh.vertexShader = 'uniform float uTime; uniform float uWind;\n' + sh.vertexShader.replace(
+      '#include <begin_vertex>',
+      `#include <begin_vertex>
+       vec4 wp = instanceMatrix * vec4(0.0,0.0,0.0,1.0);
+       float ph = wp.x*0.25 + wp.z*0.25;
+       float sway = sin(uTime*1.6 + ph) * uWind * position.y;
+       transformed.x += sway; transformed.z += sway*0.6;`
+    );
+  };
+  const mesh = new THREE.InstancedMesh(blade, mat, count);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+  const col = new THREE.Color();
+  for (let i = 0; i < count; i++) {
+    const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * radius;
+    const sc = 0.7 + Math.random() * 1.3;
+    q.setFromAxisAngle(up, Math.random() * Math.PI);
+    m.compose(new THREE.Vector3(Math.cos(a) * d, 0, Math.sin(a) * d), q, new THREE.Vector3(sc, sc, sc));
+    mesh.setMatrixAt(i, m);
+    col.setHSL(0.27 + Math.random() * 0.07, 0.5, 0.32 + Math.random() * 0.16);
+    mesh.setColorAt(i, col);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+scene.add(makeGrassField());
+
+// ====================== 물길 (흐르는 물 셰이더) ======================
+const waterU = { time: { value: 0 } };
+function makeStream() {
+  const seg = 60, len = 150, w = 7;
+  const geo = new THREE.PlaneGeometry(w, len, 6, seg);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {          // 구불구불한 물길
+    const v = pos.getY(i) / len;
+    pos.setX(i, pos.getX(i) + Math.sin(v * Math.PI * 3) * 9);
+  }
+  geo.computeVertexNormals();
+  const mat = new THREE.ShaderMaterial({
+    transparent: true,
+    uniforms: { uTime: waterU.time },
+    vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader: `uniform float uTime; varying vec2 vUv;
+      void main(){
+        float w1 = sin(vUv.y*60.0 - uTime*3.5)*0.5+0.5;
+        float w2 = sin(vUv.x*22.0 + uTime*2.2)*0.5+0.5;
+        float foam = smoothstep(0.92,1.0,w1*w2);
+        vec3 deep = vec3(0.10,0.42,0.66), shallow = vec3(0.42,0.74,0.92);
+        vec3 c = mix(deep, shallow, w1*0.6 + w2*0.4) + foam*0.5;
+        gl_FragColor = vec4(c, 0.86);
+      }`,
+  });
+  const m = new THREE.Mesh(geo, mat);
+  m.rotation.x = -Math.PI / 2; m.position.y = 0.06;
+  m.visible = false;
+  return m;
+}
+const stream = makeStream();
+scene.add(stream);
+
+// ====================== 새 (저공 비행 + 날갯짓) ======================
+function makeBird() {
+  const g = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: 0x2b2b33, roughness: .8 });
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.12, 0.5, 4, 8), mat);
+  body.rotation.z = Math.PI / 2; g.add(body);
+  function wing(side) {
+    const sh = new THREE.Shape();
+    sh.moveTo(0, 0); sh.lineTo(1.1, 0.15); sh.lineTo(1.0, -0.1); sh.lineTo(0, -0.12); sh.lineTo(0, 0);
+    const wg = new THREE.Mesh(new THREE.ShapeGeometry(sh), new THREE.MeshStandardMaterial({ color: 0x33333c, side: THREE.DoubleSide, roughness: .8 }));
+    wg.scale.z = 1; wg.position.z = side * 0.05; wg.scale.x = side;
+    const pivot = new THREE.Group(); pivot.add(wg); g.add(pivot); return pivot;
+  }
+  g.userData.wL = wing(1); g.userData.wR = wing(-1);
+  return g;
+}
+const birdsGroup = new THREE.Group();
+birdsGroup.visible = false;
+for (let i = 0; i < 6; i++) {
+  const b = makeBird();
+  b.userData.r = 22 + Math.random() * 26;
+  b.userData.h = 12 + Math.random() * 12;
+  b.userData.spd = 0.12 + Math.random() * 0.12;
+  b.userData.off = Math.random() * Math.PI * 2;
+  b.userData.flap = Math.random() * Math.PI * 2;
+  birdsGroup.add(b);
+}
+scene.add(birdsGroup);
+
+// ====================== 심은 것 관리 ======================
+const placedGroup = new THREE.Group();
+scene.add(placedGroup);
+const history = [];
+const swayables = [];                       // 바람에 흔들릴 오브젝트
+const countEl = document.getElementById('count');
+const updateCount = () => countEl.textContent = `심은 식물: ${placedGroup.children.length}개`;
+
+// ====================== 공유 재질/지오메트리 ======================
+const stemMat = new THREE.MeshStandardMaterial({ color: 0x4f8f3a, roughness: .9 });
+const leafMat = new THREE.MeshStandardMaterial({ color: 0x5aa03c, roughness: .85, side: THREE.DoubleSide });
+const petalGeo = new THREE.PlaneGeometry(0.12, 0.26);
+const centerGeo = new THREE.SphereGeometry(0.09, 8, 6);
+
+// ====================== 나무 변형 ======================
+const TREE_VARIANTS = {
+  oak:    { preset: 'Oak Medium',   base: 0.55 },
+  pine:   { preset: 'Pine Medium',  base: 0.55 },
+  aspen:  { preset: 'Aspen Medium', base: 0.55 },
+  ash:    { preset: 'Ash Medium',   base: 0.55 },
+  birch:  { preset: 'Aspen Medium', base: 0.55, bark: 'birch', barkTint: 0xf2f0e6, leafTint: 0xbcd98a },
+  cherry: { preset: 'Aspen Medium', base: 0.55, bark: 'birch', barkTint: 0xd8c6bd, leafTint: 0xffb3d9 },
+  maple:  { preset: 'Oak Medium',   base: 0.55, leafTint: 0xff7a33 },
+  golden: { preset: 'Ash Medium',   base: 0.55, leafTint: 0xffcf3a },
+};
+function makeTree(variant, seed, scaleMul) {
+  const v = TREE_VARIANTS[variant] || TREE_VARIANTS.oak;
+  const tree = new Tree();
+  tree.loadPreset(v.preset);
+  tree.options.seed = seed % 65536;
+  if (v.bark) tree.options.bark.type = v.bark;
+  if (v.barkTint != null) tree.options.bark.tint = v.barkTint;
+  if (v.leafTint != null) tree.options.leaves.tint = v.leafTint;
+  tree.generate();
+  tree.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  const r = mulberry32(seed);
+  tree.scale.setScalar(v.base * scaleMul * (0.85 + r() * 0.3));
+  return tree;
+}
+
+const BUSH_PRESETS = ['Bush 1', 'Bush 2', 'Bush 3'];
+function makeBush(seed, scaleMul) {
+  const r = mulberry32(seed);
+  const tree = new Tree();
+  tree.loadPreset(BUSH_PRESETS[Math.floor(r() * 3)]);
+  tree.options.seed = seed % 65536;
+  tree.generate();
+  tree.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  tree.scale.setScalar(0.5 * scaleMul * (0.85 + r() * 0.3));
+  return tree;
+}
+
+// ====================== 예쁜 꽃 ======================
+const FLOWER_COLORS = [0xff5b87, 0xffd23f, 0xff7b00, 0x9b5de5, 0xffffff, 0xff3b6e, 0x4cc9f0, 0xff8fb1];
+function makeBloom(style, color, r) {
+  const g = new THREE.Group();
+  const petalMat = new THREE.MeshStandardMaterial({ color, roughness: .55, side: THREE.DoubleSide });
+  const coreMat = new THREE.MeshStandardMaterial({ color: 0xffe066, roughness: .8 });
+  if (style === 'daisy') {
+    const n = 8;
+    for (let i = 0; i < n; i++) {
+      const p = new THREE.Mesh(petalGeo, petalMat);
+      const a = i / n * Math.PI * 2;
+      p.position.set(Math.cos(a) * 0.13, 0, Math.sin(a) * 0.13);
+      p.rotation.y = -a; p.rotation.x = -Math.PI / 2 + 0.55;
+      p.castShadow = true; g.add(p);
+    }
+    g.add(new THREE.Mesh(centerGeo, coreMat));
+  } else if (style === 'tulip') {
+    const n = 5;
+    for (let i = 0; i < n; i++) {
+      const p = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.34, 5, 1, true), petalMat);
+      const a = i / n * Math.PI * 2;
+      p.position.set(Math.cos(a) * 0.06, 0.16, Math.sin(a) * 0.06);
+      p.rotation.set(0.3 * Math.cos(a), 0, 0.3 * Math.sin(a));
+      p.castShadow = true; g.add(p);
+    }
+  } else { // pom — 작은 구슬 뭉치
+    const m = new THREE.MeshStandardMaterial({ color, roughness: .7 });
+    for (let i = 0; i < 7; i++) {
+      const s = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), m);
+      s.position.set((r() - .5) * .3, (r() - .5) * .3, (r() - .5) * .3);
+      s.castShadow = true; g.add(s);
+    }
+  }
+  return g;
+}
+function makeFlower(seed, scaleMul) {
+  const r = mulberry32(seed);
+  const g = new THREE.Group();
+  const styles = ['daisy', 'tulip', 'pom'];
+  const style = styles[Math.floor(r() * 3)];
+  const color = FLOWER_COLORS[Math.floor(r() * FLOWER_COLORS.length)];
+  const n = 3 + Math.floor(r() * 4);
+  for (let i = 0; i < n; i++) {
+    const h = 1.0 + r() * 1.4;
+    const ox = (r() - .5) * 1.3, oz = (r() - .5) * 1.3;
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.06, h, 5), stemMat);
+    stem.position.set(ox, h / 2, oz); stem.castShadow = true; g.add(stem);
+    // 잎
+    if (r() > .4) {
+      const leaf = new THREE.Mesh(new THREE.CircleGeometry(0.18, 6), leafMat);
+      leaf.position.set(ox, h * 0.45, oz); leaf.rotation.set(-1.0, r() * 6, 0); g.add(leaf);
+    }
+    const bloom = makeBloom(style, color, r);
+    bloom.position.set(ox, h, oz);
+    bloom.scale.setScalar(0.9 + r() * 0.5);
+    g.add(bloom);
+  }
+  g.scale.setScalar(scaleMul);
+  return g;
+}
+
+// ====================== 예쁜 돌 (군집 + 이끼) ======================
+const ROCK_COLORS = [0x8c8c86, 0x9a8f80, 0x787b80, 0xa89b88];
+function makeOneRock(r, size, color) {
+  const geo = new THREE.IcosahedronGeometry(size, 1);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    pos.setXYZ(i, pos.getX(i) * (0.8 + r() * 0.45),
+                  pos.getY(i) * (0.55 + r() * 0.35),
+                  pos.getZ(i) * (0.8 + r() * 0.45));
+  }
+  geo.computeVertexNormals();
+  const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 1, flatShading: true }));
+  m.castShadow = true; m.receiveShadow = true;
+  return m;
+}
+function makeRock(seed, scaleMul) {
+  const r = mulberry32(seed);
+  const g = new THREE.Group();
+  const color = ROCK_COLORS[Math.floor(r() * ROCK_COLORS.length)];
+  const main = makeOneRock(r, 0.6 + r() * 0.5, color);
+  main.scale.y = 0.7; main.position.y = main.scale.y * 0.4;
+  g.add(main);
+  const n = 1 + Math.floor(r() * 3);
+  for (let i = 0; i < n; i++) {
+    const s = makeOneRock(r, 0.25 + r() * 0.35, color);
+    const a = r() * Math.PI * 2, d = 0.6 + r() * 0.5;
+    s.scale.y = 0.7; s.position.set(Math.cos(a) * d, s.geometry.parameters?.radius * 0.3 || 0.15, Math.sin(a) * d);
+    g.add(s);
+  }
+  // 이끼
+  const mossMat = new THREE.MeshStandardMaterial({ color: 0x5b8c3a, roughness: 1 });
+  for (let i = 0; i < 3 + Math.floor(r() * 4); i++) {
+    const moss = new THREE.Mesh(new THREE.SphereGeometry(0.12 + r() * 0.14, 6, 5), mossMat);
+    const a = r() * Math.PI * 2, d = r() * 0.6;
+    moss.position.set(Math.cos(a) * d, 0.5 + r() * 0.35, Math.sin(a) * d);
+    moss.scale.y = 0.4; g.add(moss);
+  }
+  g.scale.setScalar(scaleMul);
+  return g;
+}
+
+// ====================== 돌길 / 연못 (정원 구경용 환경) ======================
+function makePathStone(seed) {
+  const r = mulberry32(seed);
+  const stone = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.1, 1.1, 0.25, 8),
+    new THREE.MeshStandardMaterial({ color: 0xb8b2a3, roughness: 1 })
+  );
+  stone.scale.set(1.3, 1, 1); stone.castShadow = true; stone.receiveShadow = true;
+  const g = new THREE.Group(); g.add(stone); return g;
+}
+function makePond() {
+  const g = new THREE.Group();
+  const water = new THREE.Mesh(
+    new THREE.CircleGeometry(6, 48),
+    new THREE.MeshStandardMaterial({ color: 0x2f78bb, roughness: .15, metalness: .2 })
+  );
+  water.rotation.x = -Math.PI / 2; water.position.y = 0.12; g.add(water);
+  const rim = new THREE.Mesh(
+    new THREE.TorusGeometry(6, 0.4, 8, 40),
+    new THREE.MeshStandardMaterial({ color: 0x9a8f80, roughness: 1 })
+  );
+  rim.rotation.x = -Math.PI / 2; rim.position.y = 0.1; rim.receiveShadow = true; g.add(rim);
+  return g;
+}
+
+// ====================== 생성 레지스트리 + 배치 ======================
+const SWAY_KINDS = new Set(['tree', 'bush', 'flower']);
+function create(kind, opts) {
+  const { seed, scaleMul = 1, variant = 'oak' } = opts;
+  if (kind === 'tree')   return makeTree(variant, seed, scaleMul);
+  if (kind === 'bush')   return makeBush(seed, scaleMul);
+  if (kind === 'flower') return makeFlower(seed, scaleMul);
+  if (kind === 'rock')   return makeRock(seed, scaleMul);
+  if (kind === 'pathstone') return makePathStone(seed);
+  if (kind === 'pond')   return makePond();
+  return makeBush(seed, scaleMul);
+}
+function place(kind, x, z, opts = {}) {
+  const seed = opts.seed ?? randSeed();
+  const scaleMul = opts.scaleMul ?? 1;
+  const variant = opts.variant ?? 'oak';
+  const obj = create(kind, { seed, scaleMul, variant });
+  obj.position.set(x, opts.y ?? 0, z);
+  obj.rotation.y = opts.ry ?? (Math.random() * Math.PI * 2);
+  obj.userData = { kind, variant, seed, scaleMul };
+  if (SWAY_KINDS.has(kind)) { obj.userData.phase = Math.random() * Math.PI * 2; swayables.push(obj); }
+  placedGroup.add(obj);
+  history.push(obj);
+  updateCount();
+  return obj;
+}
+function removeObject(obj) {
+  placedGroup.remove(obj);
+  const hi = history.indexOf(obj); if (hi >= 0) history.splice(hi, 1);
+  const si = swayables.indexOf(obj); if (si >= 0) swayables.splice(si, 1);
+  updateCount();
+}
+function clearGarden() {
+  placedGroup.clear(); history.length = 0; swayables.length = 0; updateCount();
+}
+
+// ====================== 팔레트 UI ======================
+const TREE_ITEMS = [
+  { v: 'oak',    emoji: '🌳', lbl: '참나무' },
+  { v: 'pine',   emoji: '🌲', lbl: '소나무' },
+  { v: 'aspen',  emoji: '🌿', lbl: '사시나무' },
+  { v: 'ash',    emoji: '🍃', lbl: '물푸레' },
+  { v: 'birch',  emoji: '🤍', lbl: '자작나무' },
+  { v: 'cherry', emoji: '🌸', lbl: '벚나무' },
+  { v: 'maple',  emoji: '🍁', lbl: '단풍나무' },
+  { v: 'golden', emoji: '🌟', lbl: '황금나무' },
+];
+const DECO_ITEMS = [
+  { k: 'bush',   emoji: '🪴', lbl: '덤불' },
+  { k: 'flower', emoji: '🌷', lbl: '꽃' },
+  { k: 'rock',   emoji: '🪨', lbl: '돌' },
+];
+let selKind = 'tree', selVariant = 'oak';
+
+function buildPalette() {
+  const tEl = document.getElementById('palette-trees');
+  TREE_ITEMS.forEach(it => {
+    const d = document.createElement('div');
+    d.className = 'item' + (selKind === 'tree' && selVariant === it.v ? ' active' : '');
+    d.dataset.sel = 'tree:' + it.v;
+    d.innerHTML = `<span class="emoji">${it.emoji}</span><span class="lbl">${it.lbl}</span>`;
+    d.onclick = () => selectItem('tree', it.v);
+    tEl.appendChild(d);
+  });
+  const dEl = document.getElementById('palette-deco');
+  DECO_ITEMS.forEach(it => {
+    const d = document.createElement('div');
+    d.className = 'item';
+    d.dataset.sel = it.k + ':';
+    d.innerHTML = `<span class="emoji">${it.emoji}</span><span class="lbl">${it.lbl}</span>`;
+    d.onclick = () => selectItem(it.k, '');
+    dEl.appendChild(d);
+  });
+}
+function selectItem(kind, variant) {
+  selKind = kind; selVariant = variant;
+  if (removeMode) toggleRemove();           // 선택하면 제거모드 해제
+  const key = kind + ':' + variant;
+  document.querySelectorAll('.item').forEach(x => x.classList.toggle('active', x.dataset.sel === key));
+}
+buildPalette();
+
+// 크기 슬라이더
+const sizeEl = document.getElementById('size'), sizeVal = document.getElementById('size-val');
+let curScale = 1;
+sizeEl.oninput = () => { curScale = parseFloat(sizeEl.value); sizeVal.textContent = curScale.toFixed(2).replace(/0$/, '') + '×'; };
+
+// 제거 모드
+let removeMode = false;
+const removeBtn = document.getElementById('btn-remove');
+function toggleRemove(force) {
+  removeMode = force != null ? force : !removeMode;
+  removeBtn.textContent = removeMode ? '🗑 제거 모드 켜짐 (클릭=삭제)' : '🗑 제거 모드 끄기';
+  removeBtn.classList.toggle('active', removeMode);
+  renderer.domElement.style.cursor = removeMode ? 'crosshair' : 'default';
+  if (removeMode) showHint('🗑 제거할 식물을 클릭하세요');
+}
+removeBtn.onclick = () => toggleRemove();
+
+// ====================== 클릭: 심기 / 제거 ======================
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+let downPos = null;
+
+renderer.domElement.addEventListener('pointerdown', e => { downPos = { x: e.clientX, y: e.clientY }; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downPos) return;
+  const moved = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
+  downPos = null;
+  if (moved > 6) return;                                  // 드래그=회전
+  if (e.clientX > innerWidth - 270) return;               // 패널 영역
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+
+  if (removeMode) {
+    const hits = raycaster.intersectObjects(placedGroup.children, true);
+    if (hits.length) {
+      let o = hits[0].object;
+      while (o.parent && o.parent !== placedGroup) o = o.parent;
+      if (o.parent === placedGroup) removeObject(o);
+    }
+    return;
+  }
+  const hit = raycaster.intersectObject(ground, false)[0];
+  if (!hit) return;
+  controls.autoRotate = false;
+  ambience.ensure();                                      // 첫 상호작용 시 오디오 준비
+  place(selKind, hit.point.x, hit.point.z, { scaleMul: curScale, variant: selVariant });
+  hideHintSoon();
+});
+
+// ====================== 버튼: 되돌리기/비우기/구경 ======================
+document.getElementById('btn-undo').onclick = () => { const l = history[history.length - 1]; if (l) removeObject(l); };
+document.getElementById('btn-clear').onclick = () => { clearGarden(); controls.autoRotate = false; };
+
+function buildShowcaseGarden() {
+  clearGarden();
+  const ring = ['oak', 'aspen', 'pine', 'cherry', 'ash', 'maple', 'golden', 'birch', 'oak', 'aspen'];
+  ring.forEach((v, i) => {
+    const a = (i / ring.length) * Math.PI * 2 + 0.3, d = 34 + Math.random() * 7;
+    place('tree', Math.cos(a) * d, Math.sin(a) * d, { variant: v, scaleMul: 1.15 });
+  });
+  place('tree', -12, -6, { variant: 'cherry', scaleMul: 1.3 });
+  place('tree', 13, -8, { variant: 'oak', scaleMul: 1.3 });
+  for (let z = -20; z <= 20; z += 3) place('pathstone', (Math.random() - .5) * 0.6, z);
+  place('pond', -16, 14);
+  for (let i = 0; i < 12; i++) { const a = Math.random() * 6.28, d = 8 + Math.random() * 18; place('bush', Math.cos(a) * d, Math.sin(a) * d); }
+  [[8, 8], [-8, 10], [10, -14], [-14, -10], [18, 4], [-4, 18]].forEach(([bx, bz]) => {
+    for (let i = 0; i < 6; i++) place('flower', bx + (Math.random() - .5) * 5, bz + (Math.random() - .5) * 5);
+  });
+  for (let i = 0; i < 7; i++) { const a = Math.random() * 6.28, d = 10 + Math.random() * 20; place('rock', Math.cos(a) * d, Math.sin(a) * d); }
+  controls.target.set(0, 3, 0); controls.autoRotate = true;
+  ambience.ensure(); setToggle('water', true); setToggle('wind', true); setToggle('birds', true);
+  showHint('✨ 미리 완성된 정원 · 드래그로 둘러보세요', 4500);
+}
+document.getElementById('btn-tour').onclick = buildShowcaseGarden;
+
+// ====================== 저장 / 불러오기 (JSON) ======================
+function serialize() {
+  return {
+    version: 1,
+    objects: placedGroup.children.map(o => ({
+      k: o.userData.kind, v: o.userData.variant, s: o.userData.seed, sc: o.userData.scaleMul,
+      x: +o.position.x.toFixed(3), y: +o.position.y.toFixed(3), z: +o.position.z.toFixed(3),
+      ry: +o.rotation.y.toFixed(4),
+    })),
+  };
+}
+document.getElementById('btn-save').onclick = () => {
+  const data = JSON.stringify(serialize());
+  const blob = new Blob([data], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `my-garden-${Date.now()}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+  toast(`정원을 저장했어요 (${placedGroup.children.length}개)`);
+};
+const fileInput = document.getElementById('file-input');
+document.getElementById('btn-load').onclick = () => fileInput.click();
+fileInput.onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const data = JSON.parse(rd.result);
+      if (!data.objects) throw new Error('형식 오류');
+      clearGarden();
+      data.objects.forEach(o => place(o.k, o.x, o.z, { seed: o.s, scaleMul: o.sc, variant: o.v, y: o.y, ry: o.ry }));
+      controls.autoRotate = false;
+      toast(`정원을 불러왔어요 (${data.objects.length}개)`);
+    } catch (err) { toast('불러오기 실패: ' + err.message); }
+    fileInput.value = '';
+  };
+  rd.readAsText(f);
+};
+
+// ====================== 오디오 (절차적 환경음) ======================
+const ambience = {
+  ctx: null, master: null, noise: null,
+  on: { wind: false, birds: false, water: false },
+  windNodes: null, waterNodes: null, birdTimer: null,
+  ensure() {
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    this.ctx = new AC();
+    this.master = this.ctx.createGain(); this.master.gain.value = 0.8;
+    this.master.connect(this.ctx.destination);
+    // 2초 노이즈 버퍼
+    const len = this.ctx.sampleRate * 2;
+    const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+    const ch = buf.getChannelData(0); let last = 0;
+    for (let i = 0; i < len; i++) { const w = Math.random() * 2 - 1; last = (last + 0.02 * w) / 1.02; ch[i] = last * 3.5; }
+    this.noise = buf;
+  },
+  startWind() {
+    const c = this.ctx, src = c.createBufferSource(); src.buffer = this.noise; src.loop = true;
+    const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 600;
+    const g = c.createGain(); g.gain.value = 0.0;
+    src.connect(lp).connect(g).connect(this.master); src.start();
+    this.windNodes = { src, lp, g };
+  },
+  stopWind() { if (this.windNodes) { try { this.windNodes.src.stop(); } catch (e) {} this.windNodes.g.disconnect(); this.windNodes = null; } },
+  startWater() {
+    const c = this.ctx, src = c.createBufferSource(); src.buffer = this.noise; src.loop = true;
+    const hp = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 700;
+    const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1600; bp.Q.value = 0.6;
+    const g = c.createGain(); g.gain.value = 0.0;
+    src.connect(hp).connect(bp).connect(g).connect(this.master); src.start();
+    g.gain.linearRampToValueAtTime(0.17, c.currentTime + 1.0);
+    this.waterNodes = { src, g };
+  },
+  stopWater() { if (this.waterNodes) { try { this.waterNodes.src.stop(); } catch (e) {} this.waterNodes.g.disconnect(); this.waterNodes = null; } },
+  chirp() {
+    const c = this.ctx, t = c.currentTime;
+    const notes = 1 + Math.floor(Math.random() * 3);
+    for (let n = 0; n < notes; n++) {
+      const st = t + n * 0.13;
+      const o = c.createOscillator(); o.type = 'sine';
+      const g = c.createGain();
+      const base = 1900 + Math.random() * 1500;
+      o.frequency.setValueAtTime(base, st);
+      o.frequency.exponentialRampToValueAtTime(base * 1.5, st + 0.06);
+      o.frequency.exponentialRampToValueAtTime(base * 0.85, st + 0.14);
+      g.gain.setValueAtTime(0.0001, st);
+      g.gain.exponentialRampToValueAtTime(0.11, st + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, st + 0.16);
+      o.connect(g).connect(this.master); o.start(st); o.stop(st + 0.18);
+    }
+  },
+  scheduleBirds() {
+    if (!this.on.birds) return;
+    this.chirp();
+    this.birdTimer = setTimeout(() => this.scheduleBirds(), 700 + Math.random() * 3200);
+  },
+  set(kind, val) {
+    this.ensure();
+    this.on[kind] = val;
+    if (kind === 'wind')  { val ? (this.windNodes || this.startWind()) : this.stopWind(); }
+    if (kind === 'water') { val ? (this.waterNodes || this.startWater()) : this.stopWater(); }
+    if (kind === 'birds') { if (val) this.scheduleBirds(); else { clearTimeout(this.birdTimer); this.birdTimer = null; } }
+  },
+};
+
+// 토글 UI <-> 상태/비주얼/사운드 연결
+const tg = { wind: document.getElementById('tg-wind'), birds: document.getElementById('tg-birds'), water: document.getElementById('tg-water') };
+let windTarget = 0.12;           // 기본 약한 바람(항상 살랑)
+function setToggle(kind, val) {
+  ambience.set(kind, val);
+  tg[kind].classList.toggle('active', val);
+  if (kind === 'water') stream.visible = val;
+  if (kind === 'birds') birdsGroup.visible = val;
+  if (kind === 'wind')  windTarget = val ? 0.5 : 0.12;
+}
+Object.keys(tg).forEach(k => tg[k].onclick = () => setToggle(k, !ambience.on[k]));
+
+// ====================== 안내문 / 토스트 ======================
+const hintEl = document.getElementById('hint');
+let hintTimer;
+function showHint(msg, ms = 3000) { hintEl.textContent = msg; hintEl.style.opacity = '1'; clearTimeout(hintTimer); hintTimer = setTimeout(() => hintEl.style.opacity = '0', ms); }
+function hideHintSoon() { clearTimeout(hintTimer); hintTimer = setTimeout(() => hintEl.style.opacity = '0', 1800); }
+const toastEl = document.getElementById('toast');
+let toastTimer;
+function toast(msg) { toastEl.textContent = msg; toastEl.classList.add('show'); clearTimeout(toastTimer); toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200); }
+
+// ====================== 루프 ======================
+const clock = new THREE.Clock();
+let windVal = 0.12, gust = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime(), dt = Math.min(clock.getDelta ? 0 : 0, 0);
+
+  // 바람 세기(돌풍 포함) 보간
+  windVal += (windTarget - windVal) * 0.02;
+  gust = 0.5 + 0.5 * Math.sin(t * 0.6) * Math.sin(t * 0.23 + 1.3);
+  windU.strength.value = windVal * (0.7 + gust * 0.6);
+  windU.time.value = t;
+  waterU.time.value = t;
+
+  // 나무/꽃 흔들림
+  const amp = windU.strength.value * 0.07;
+  for (const o of swayables) {
+    o.rotation.x = Math.sin(t * 0.9 + o.userData.phase) * amp;
+    o.rotation.z = Math.cos(t * 0.75 + o.userData.phase) * amp;
+  }
+
+  // 새 비행 + 날갯짓
+  if (birdsGroup.visible) {
+    for (const b of birdsGroup.children) {
+      const u = b.userData, ang = t * u.spd + u.off;
+      b.position.set(Math.cos(ang) * u.r, u.h + Math.sin(t + u.off) * 1.5, Math.sin(ang) * u.r);
+      b.rotation.y = -ang + Math.PI / 2;
+      const fl = Math.sin(t * 12 + u.flap) * 0.7;
+      u.wL.rotation.z = fl; u.wR.rotation.z = -fl;
+    }
+  }
+
+  // 바람 소리 게인/음색 변조
+  if (ambience.on.wind && ambience.windNodes) {
+    const g = 0.05 + windU.strength.value * 0.22;
+    ambience.windNodes.g.gain.value += (g - ambience.windNodes.g.gain.value) * 0.05;
+    ambience.windNodes.lp.frequency.value = 350 + gust * 550;
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ====================== 시작 샘플 ======================
+place('tree', -6, 2, { variant: 'cherry', scaleMul: 1 });
+place('tree', 7, -3, { variant: 'oak', scaleMul: 1 });
+place('bush', 2, 6, {});
+place('flower', -3, -4, {});
+updateCount();
+
+// 디버그 훅
+window.__GARDEN = { THREE, renderer, scene, camera, controls, placedGroup, ground, swayables,
+  buildShowcaseGarden, place, removeObject, clearGarden, setToggle, ambience, serialize, stream, birdsGroup };
+
+const loader = document.getElementById('loader');
+loader.style.opacity = '0';
+setTimeout(() => loader.remove(), 600);
+</script>
+</body>
+</html>
